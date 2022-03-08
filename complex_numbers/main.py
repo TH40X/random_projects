@@ -3,6 +3,7 @@ from tkinter import Tk, Canvas
 from cmath import sin, exp, log, tan, acos
 from math import pi
 import time
+from itertools import product
 
 
 class App(Tk):
@@ -12,11 +13,14 @@ class App(Tk):
         self.fen_width = 1500
         self.fen_height = 900
         self.geometry(str(self.fen_width) + "x" + str(self.fen_height) + "+5+5")
+        self.bind("<Motion>", self.pointer)
 
         self.can = Canvas(self, width=self.fen_width, height=self.fen_height, bg="#000")
         self.can.pack()
 
         self.unit = unit
+        self.near = []
+        self.near_proj = []
 
         self.matrix = dict()
 
@@ -44,6 +48,8 @@ class App(Tk):
 
     def center(self, pos):
         return pos[0] * self.unit + self.fen_width / 2, -pos[1] * self.unit + self.fen_height / 2
+    def uncenter(self, pos):
+        return (pos[0] - self.fen_width / 2) / self.unit, (pos[1] - self.fen_height / 2) / -self.unit
 
     def load_lines(self):
         for x in (k for k in range(int(-self.fen_width / 2 / self.unit), int(self.fen_width / 2 / self.unit + 1))):
@@ -94,23 +100,31 @@ class App(Tk):
             self.state += 1
             self.after(16, self.translate)
 
-    def setup_points_func(self, xmin, xmax, ymin, ymax, density):
-        x = xmin
-        while x < xmax:
-            y = ymin
-            while y < ymax:
-                xc, yc = self.apply(x, y)
-                if xc is None:
-                    y += density
-                    continue
-                xc, yc = self.center((xc, yc))
-                if xc < 0 or xc > self.fen_width or yc < 0 or yc > self.fen_height:
-                    y += density
-                    continue
-                color = self.get_color((x, y), xmin, xmax, ymin, ymax)
-                self.matrix[(x, y)] = self.can.create_oval(xc - 3, yc - 3, xc + 3, yc + 3, fill=color, outline="")
-                y += density
-            x += density
+    def pointer(self, evt):
+        cx, cy = evt.x, evt.y
+        if not self.near:
+            # Premiere actualisation
+            for tx, ty in product(range(cx-50, cx+51, 10), range(cy-50, cy+51, 10)):
+                self.near.append(self.can.create_oval(tx-3, ty-3, tx+3, ty+3, outline="", fill="blue"))
+        else:
+            # On actualise juste les positions des points
+            i = 0
+            for tx, ty in product(range(cx-50, cx+51, 10), range(cy-50, cy+51, 10)):
+                self.can.coords(self.near[i], tx-3, ty-3, tx+3, ty+3)
+                i += 1
+
+        if not self.near_proj:
+            # Premiere actualisation
+            for tx, ty in product(range(cx-50, cx+51, 10), range(cy-50, cy+51, 10)):
+                x, y = self.center(self.apply(*self.uncenter((tx, ty))))
+                self.near_proj.append(self.can.create_oval(x-3, y-3, x+3, y+3, outline="", fill="lightblue"))
+        else:
+            i = 0
+            for tx, ty in product(range(cx-50, cx+51, 10), range(cy-50, cy+51, 10)):
+                x, y = self.center(self.apply(*self.uncenter((tx, ty))))
+                self.can.coords(self.near_proj[i], x-3, y-3, x+3, y+3)
+                i += 1
+
 
     def apply(self, x, y):
         c = x + 1j * y
@@ -121,11 +135,16 @@ class App(Tk):
         return r.real, r.imag
 
     def funct(self, c):
-        return c*c*c*c*c
+        ## REPLACE FUNCTION HERE
+        return acos(c)
 
 
-app = App(200)
+def enable_pointer():
+    app.POINTER = True
+
+
+app = App(300)
 app.load_lines()
-app.setup_points(-2, 2, -2, 2, 0.06)
+app.setup_points(-4, 4, -4, 4, 0.1)
 app.translate(True)
 app.mainloop()
